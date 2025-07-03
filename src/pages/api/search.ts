@@ -38,11 +38,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Step 1: Search in meetings table (which contains the denormalized data)
     sendEvent('step', { step: 'Searching meeting notes...', progress: 25 })
     
-    const { data: meetings, error: meetingsError } = await supabase
-      .from('meetings')
-      .select('*')
-      .or(`document_notes_content.ilike.%${query}%,submission_notes.ilike.%${query}%,meeting_or_assignment_name.ilike.%${query}%`)
-      .limit(limit)
+    // For multi-word queries, split into individual terms and search for any of them
+    const searchTerms = query.trim().split(/\s+/).filter(term => term.length > 2)
+    let searchQuery
+    
+    if (searchTerms.length > 1) {
+      // Multi-word search: look for any of the individual terms
+      const termQueries = searchTerms.map(term => 
+        `document_notes_content.ilike.%${term}%,submission_notes.ilike.%${term}%,meeting_or_assignment_name.ilike.%${term}%`
+      ).join(',')
+      searchQuery = supabase
+        .from('meetings')
+        .select('*')
+        .or(termQueries)
+        .limit(limit)
+    } else {
+      // Single word search: use original logic
+      searchQuery = supabase
+        .from('meetings')
+        .select('*')
+        .or(`document_notes_content.ilike.%${query}%,submission_notes.ilike.%${query}%,meeting_or_assignment_name.ilike.%${query}%`)
+        .limit(limit)
+    }
+    
+    const { data: meetings, error: meetingsError } = await searchQuery
 
     if (meetingsError) {
       console.error('Meetings search error:', meetingsError)
