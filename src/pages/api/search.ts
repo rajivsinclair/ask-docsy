@@ -39,12 +39,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     sendEvent('step', { step: 'Searching meeting notes...', progress: 25 })
     
     // For multi-word queries, split into individual terms and search for any of them
-    const searchTerms = query.trim().split(/\s+/).filter(term => term.length > 2)
+    const searchTerms = query.trim().split(/\s+/).filter((term: string) => term.length > 2)
     let searchQuery
     
     if (searchTerms.length > 1) {
       // Multi-word search: look for any of the individual terms
-      const termQueries = searchTerms.map(term => 
+      const termQueries = searchTerms.map((term: string) => 
         `document_notes_content.ilike.%${term}%,submission_notes.ilike.%${term}%,meeting_or_assignment_name.ilike.%${term}%`
       ).join(',')
       searchQuery = supabase
