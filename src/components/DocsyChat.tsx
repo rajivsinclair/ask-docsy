@@ -111,8 +111,10 @@ export function DocsyChat() {
               console.log('Event type:', currentEvent)
             } else if (line.startsWith('data:') && currentEvent) {
               try {
-                const data = JSON.parse(line.substring(5))
-                console.log('Event data for', currentEvent, ':', data)
+                const jsonString = line.substring(5).trim()
+                console.log('Parsing JSON for', currentEvent, 'length:', jsonString.length)
+                const data = JSON.parse(jsonString)
+                console.log('Event data for', currentEvent, '- parsed successfully, type:', typeof data)
                 
                 if (currentEvent === 'step') {
                   setWorkflowSteps(prev => [...prev, {
@@ -156,7 +158,10 @@ export function DocsyChat() {
                 }
                 // Don't reset currentEvent here - let it persist until next event
               } catch (parseError) {
-                console.error('Error parsing search data:', parseError, 'Line:', line)
+                console.error('Error parsing search data for event:', currentEvent)
+                console.error('Parse error:', parseError)
+                console.error('Line length:', line.length)
+                console.error('Line preview:', line.substring(0, 200) + '...')
               }
             }
           }
