@@ -1,250 +1,275 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import DocsyAvatar from './DocsyAvatar';
-import { MCPClient } from '@/lib/mcp-client';
-import { GeminiClient } from '@/lib/gemini-client';
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Send, Filter, Calendar, MapPin, Loader2 } from 'lucide-react'
+import { DocsyAvatar } from './DocsyAvatar'
+import { SearchFilters } from './SearchFilters'
+import { ResultCard } from './ResultCard'
+// Remove import of mcp-client since we'll use API routes
 
-interface Message {
-  id: string;
-  type: 'user' | 'docsy';
-  content: string;
-  timestamp: Date;
+interface SearchResult {
+  id: string
+  text: string
+  score: number
+  metadata: {
+    program: string
+    agency: string
+    assignment_name: string
+    meeting_date: string
+    document_type: string
+  }
+  search_type: string
+  context?: any
 }
 
-interface Filter {
-  program?: string;
-  agency?: string;
-  dateRange?: { start: Date; end: Date };
+interface ChatMessage {
+  id: string
+  type: 'user' | 'assistant'
+  content: string
+  results?: SearchResult[]
+  timestamp: Date
 }
 
-export default function DocsyChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'docsy',
-      content: "Hi! I'm Docsy, your friendly government services assistant. Ask me anything about government programs, benefits, or services!",
-      timestamp: new Date(),
-    }
-  ]);
-  const [input, setInput] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const [filters, setFilters] = useState<Filter>({});
-  const [programs, setPrograms] = useState<string[]>([]);
-  const [agencies, setAgencies] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+export function DocsyChat() {
+  const [query, setQuery] = useState('')
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isThinking, setIsThinking] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    programs: [] as string[],
+    agencies: [] as string[],
+    date_from: '',
+    date_to: '',
+    search_method: 'hybrid' as 'semantic' | 'keyword' | 'hybrid'
+  })
 
-  const mcpClient = new MCPClient();
-  const geminiClient = new GeminiClient();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!query.trim() || isThinking) return
 
-  useEffect(() => {
-    // Load programs and agencies for filters
-    loadFilterOptions();
-  }, []);
-
-  const loadFilterOptions = async () => {
-    try {
-      const [programsData, agenciesData] = await Promise.all([
-        mcpClient.getPrograms(),
-        mcpClient.getAgencies(),
-      ]);
-      setPrograms(programsData);
-      setAgencies(agenciesData);
-    } catch (error) {
-      console.error('Error loading filter options:', error);
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isThinking) return;
-
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: input,
-      timestamp: new Date(),
-    };
+      content: query,
+      timestamp: new Date()
+    }
 
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsThinking(true);
+    setMessages(prev => [...prev, userMessage])
+    setIsThinking(true)
+    setQuery('')
 
     try {
-      // Search documents using MCP
-      const searchResults = await mcpClient.searchDocuments(input, filters);
+      // 1. Search using secure API route
+      const searchResponse = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, filters, limit: 10 })
+      })
       
-      // Generate response using Gemini
-      const response = await geminiClient.generateResponse(input, searchResults);
+      if (!searchResponse.ok) {
+        throw new Error('Search failed')
+      }
       
-      const docsyMessage: Message = {
+      const searchResults = await searchResponse.json()
+      
+      // 2. Generate AI response using secure API route
+      const chatResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, searchResults })
+      })
+      
+      if (!chatResponse.ok) {
+        throw new Error('Failed to generate response')
+      }
+      
+      const { response: aiResponse } = await chatResponse.json()
+      
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'docsy',
-        content: response,
-        timestamp: new Date(),
-      };
+        type: 'assistant',
+        content: aiResponse,
+        results: searchResults,
+        timestamp: new Date()
+      }
 
-      setMessages(prev => [...prev, docsyMessage]);
+      setMessages(prev => [...prev, assistantMessage])
     } catch (error) {
-      console.error('Error processing query:', error);
-      const errorMessage: Message = {
+      console.error('Search error:', error)
+      
+      const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'docsy',
-        content: "I'm sorry, I encountered an error while searching for that information. Please try again!",
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+        type: 'assistant',
+        content: `I'm sorry, I encountered an error while searching: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, errorMessage])
     } finally {
-      setIsThinking(false);
+      setIsThinking(false)
     }
-  };
+  }
+
+  const exampleQueries = [
+    "What housing policies are being discussed in Chicago?",
+    "Show me recent police reform discussions across cities",
+    "What did the Detroit City Council decide about budget cuts?",
+    "Compare climate change initiatives in different cities"
+  ]
+
+  const handleExampleClick = (example: string) => {
+    setQuery(example)
+  }
 
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <DocsyAvatar isThinking={isThinking} isIdle={!isThinking} className="w-16 h-16" />
-          <h1 className="text-3xl font-bold text-gray-800">Ask Docsy</h1>
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-        >
-          Filters {showFilters ? '▲' : '▼'}
-        </button>
+    <div className="max-w-4xl mx-auto">
+      {/* Docsy Avatar */}
+      <div className="flex justify-center mb-8">
+        <DocsyAvatar isThinking={isThinking} />
       </div>
 
-      {/* Filters */}
+      {/* Search Form */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+        className="bg-white rounded-2xl shadow-xl p-6 mb-8"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Ask Docsy about local government meetings..."
+              className="w-full px-6 py-4 text-lg border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              disabled={isThinking}
+            />
+            <div className="absolute right-2 top-2 flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
+              >
+                <Filter size={20} />
+              </button>
+              <button
+                type="submit"
+                disabled={isThinking || !query.trim()}
+                className="bg-purple-600 text-white p-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isThinking ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <SearchFilters filters={filters} onChange={setFilters} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </form>
+
+        {/* Example Queries */}
+        {messages.length === 0 && (
+          <div className="mt-6">
+            <p className="text-sm text-gray-600 mb-3">Try asking about:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {exampleQueries.map((example, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleExampleClick(example)}
+                  className="text-left p-3 text-sm bg-gray-50 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
+                >
+                  "{example}"
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Thinking Indicator */}
       <AnimatePresence>
-        {showFilters && (
+        {isThinking && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-white rounded-lg shadow-md p-4 mb-4 overflow-hidden"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white rounded-2xl shadow-lg p-6 mb-6"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Program</label>
-                <select
-                  value={filters.program || ''}
-                  onChange={(e) => setFilters({ ...filters, program: e.target.value || undefined })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Programs</option>
-                  {programs.map(program => (
-                    <option key={program} value={program}>{program}</option>
-                  ))}
-                </select>
+            <div className="flex items-center space-x-3">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Agency</label>
-                <select
-                  value={filters.agency || ''}
-                  onChange={(e) => setFilters({ ...filters, agency: e.target.value || undefined })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Agencies</option>
-                  {agencies.map(agency => (
-                    <option key={agency} value={agency}>{agency}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onChange={(e) => {
-                    const date = e.target.value ? new Date(e.target.value) : undefined;
-                    setFilters({
-                      ...filters,
-                      dateRange: date ? { start: date, end: new Date() } : undefined
-                    });
-                  }}
-                />
-              </div>
+              <span className="text-gray-600">Docsy is searching through thousands of meetings...</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow-md p-6 mb-4">
-        <div className="space-y-4">
+      <div className="space-y-6">
+        <AnimatePresence>
           {messages.map((message) => (
             <motion.div
               key={message.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className={`${
+                message.type === 'user' 
+                  ? 'ml-auto max-w-2xl' 
+                  : 'mr-auto max-w-full'
+              }`}
             >
-              <div className={`max-w-2xl ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
-                {message.type === 'docsy' && (
-                  <DocsyAvatar className="w-10 h-10 mb-2" isThinking={false} isIdle={false} />
-                )}
-                <div
-                  className={`rounded-lg p-4 ${
-                    message.type === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {message.type === 'docsy' ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
-                      {message.content}
-                    </ReactMarkdown>
-                  ) : (
-                    <p>{message.content}</p>
+              {message.type === 'user' ? (
+                <div className="bg-purple-600 text-white p-4 rounded-2xl rounded-br-sm">
+                  <p>{message.content}</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl shadow-lg p-6">
+                  {/* AI Response */}
+                  <div className="prose prose-sm max-w-none mb-6">
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  </div>
+
+                  {/* Search Results */}
+                  {message.results && message.results.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <Calendar size={20} className="mr-2" />
+                        Meeting Records ({message.results.length})
+                      </h4>
+                      <div className="grid gap-4">
+                        {message.results.slice(0, 5).map((result, index) => (
+                          <ResultCard key={index} result={result} />
+                        ))}
+                      </div>
+                      {message.results.length > 5 && (
+                        <p className="text-sm text-gray-500 mt-4 text-center">
+                          And {message.results.length - 5} more results...
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {message.timestamp.toLocaleTimeString()}
-                </p>
-              </div>
+              )}
             </motion.div>
           ))}
-          {isThinking && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-start"
-            >
-              <div className="flex items-center space-x-2">
-                <DocsyAvatar className="w-10 h-10" isThinking={true} isIdle={false} />
-                <div className="bg-gray-100 rounded-lg p-4">
-                  <div className="flex space-x-1">
-                    <span className="thinking-bubble"></span>
-                    <span className="thinking-bubble"></span>
-                    <span className="thinking-bubble"></span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </div>
+        </AnimatePresence>
       </div>
-
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="flex space-x-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me about government services..."
-          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isThinking}
-        />
-        <button
-          type="submit"
-          disabled={isThinking || !input.trim()}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Send
-        </button>
-      </form>
     </div>
-  );
+  )
 }

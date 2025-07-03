@@ -7,26 +7,28 @@ module.exports = {
   ],
   theme: {
     extend: {
-      fontFamily: {
-        'inter': ['Inter', 'sans-serif'],
-      },
       colors: {
-        'docsy-blue': '#0D47A1',
-        'docsy-light-blue': '#1976D2',
-        'docsy-orange': '#FF6F00',
-        'docsy-light-orange': '#FFB300',
+        purple: {
+          50: '#faf5ff',
+          100: '#f3e8ff',
+          200: '#e9d5ff',
+          300: '#d8b4fe',
+          400: '#c084fc',
+          500: '#a855f7',
+          600: '#9333ea',
+          700: '#7c3aed',
+          800: '#6b21a8',
+          900: '#581c87',
+        },
       },
       animation: {
         'bounce-slow': 'bounce 2s infinite',
-        'float': 'float 3s ease-in-out infinite',
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-slow': 'pulse 3s infinite',
       },
-      keyframes: {
-        float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-10px)' },
-        }
-      }
+      boxShadow: {
+        'xl': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      },
     },
   },
   plugins: [],
