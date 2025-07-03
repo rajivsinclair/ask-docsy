@@ -89,7 +89,7 @@ export function DocsyChat() {
         throw new Error('Search failed')
       }
       
-      // Read search stream and collect results
+      // Read search stream and collect results - SIMPLIFIED APPROACH
       const searchReader = searchResponse.body?.getReader()
       const searchDecoder = new TextDecoder()
       let searchBuffer = ''
@@ -100,70 +100,82 @@ export function DocsyChat() {
           const { done, value } = await searchReader.read()
           if (done) break
           
-          searchBuffer += searchDecoder.decode(value, { stream: true })
-          const lines = searchBuffer.split('\n')
-          searchBuffer = lines.pop() || '' // Keep incomplete line in buffer
+          const chunk = searchDecoder.decode(value, { stream: true })
+          searchBuffer += chunk
           
-          let currentEvent = ''
-          for (const line of lines) {
-            if (line.startsWith('event:')) {
-              currentEvent = line.substring(6).trim()
-              console.log('Event type:', currentEvent)
-            } else if (line.startsWith('data:') && currentEvent) {
-              try {
-                const jsonString = line.substring(5).trim()
-                console.log('Parsing JSON for', currentEvent, 'length:', jsonString.length)
-                const data = JSON.parse(jsonString)
-                console.log('Event data for', currentEvent, '- parsed successfully, type:', typeof data)
+          // Process complete events (event + data pairs ending with double newline)
+          let eventStart = 0
+          while (true) {
+            const eventIndex = searchBuffer.indexOf('event:', eventStart)
+            if (eventIndex === -1) break
+            
+            const dataIndex = searchBuffer.indexOf('data:', eventIndex)
+            if (dataIndex === -1) break
+            
+            const nextEventIndex = searchBuffer.indexOf('\n\n', dataIndex)
+            if (nextEventIndex === -1) break // Wait for complete event
+            
+            const eventType = searchBuffer.substring(eventIndex + 6, searchBuffer.indexOf('\n', eventIndex)).trim()
+            const dataStart = dataIndex + 5
+            const dataEnd = nextEventIndex
+            const dataString = searchBuffer.substring(dataStart, dataEnd).trim()
+            
+            console.log('Processing event:', eventType, 'data length:', dataString.length)
+            
+            try {
+              if (eventType === 'step') {
+                const stepData = JSON.parse(dataString)
+                setWorkflowSteps(prev => [...prev, {
+                  step: stepData.step,
+                  progress: stepData.progress,
+                  timestamp: new Date().toISOString()
+                }])
+              } else if (eventType === 'results') {
+                console.log('FOUND RESULTS EVENT! Parsing data...')
+                const resultsData = JSON.parse(dataString)
+                finalSearchResults = Array.isArray(resultsData) ? resultsData : []
+                setSearchResults(finalSearchResults)
+                console.log('SUCCESSFULLY CAPTURED:', finalSearchResults.length, 'search results')
                 
-                if (currentEvent === 'step') {
+                // Show real data found
+                if (finalSearchResults.length > 0) {
                   setWorkflowSteps(prev => [...prev, {
-                    step: data.step,
-                    progress: data.progress,
+                    step: `📊 REAL DATA: Found ${finalSearchResults.length} meeting records`,
+                    progress: 60,
                     timestamp: new Date().toISOString()
                   }])
-                } else if (currentEvent === 'results') {
-                  console.log('PROCESSING results event, raw data:', data)
-                  console.log('Data type:', typeof data, 'Array?', Array.isArray(data))
-                  finalSearchResults = data || []
-                  setSearchResults(finalSearchResults)
-                  console.log('CAPTURED search results:', finalSearchResults?.length || 0, 'items')
-                  console.log('Final search results variable:', finalSearchResults)
-                  // Show real data found
-                  if (finalSearchResults && finalSearchResults.length > 0) {
+                  // Show source agencies
+                  const agencySet = new Set(finalSearchResults.slice(0, 3).map((r: any) => r.metadata?.agency).filter(Boolean))
+                  const agencies = Array.from(agencySet)
+                  if (agencies.length > 0) {
                     setWorkflowSteps(prev => [...prev, {
-                      step: `📊 REAL DATA: Found ${finalSearchResults.length} meeting records`,
-                      progress: 60,
-                      timestamp: new Date().toISOString()
-                    }])
-                    // Show source agencies
-                    const agencySet = new Set(finalSearchResults.slice(0, 3).map((r: any) => r.metadata?.agency).filter(Boolean))
-                    const agencies = Array.from(agencySet)
-                    if (agencies.length > 0) {
-                      setWorkflowSteps(prev => [...prev, {
-                        step: `🏛️ ACTUAL SOURCES: ${agencies.join(', ')}`,
-                        progress: 70,
-                        timestamp: new Date().toISOString()
-                      }])
-                    }
-                  } else {
-                    setWorkflowSteps(prev => [...prev, {
-                      step: `❌ PROBLEM: Search returned 0 results`,
-                      progress: 60,
+                      step: `🏛️ ACTUAL SOURCES: ${agencies.join(', ')}`,
+                      progress: 70,
                       timestamp: new Date().toISOString()
                     }])
                   }
-                } else if (currentEvent === 'error') {
-                  throw new Error(data.error || 'Search failed')
+                } else {
+                  setWorkflowSteps(prev => [...prev, {
+                    step: `❌ PROBLEM: Search returned 0 results`,
+                    progress: 60,
+                    timestamp: new Date().toISOString()
+                  }])
                 }
-                // Don't reset currentEvent here - let it persist until next event
-              } catch (parseError) {
-                console.error('Error parsing search data for event:', currentEvent)
-                console.error('Parse error:', parseError)
-                console.error('Line length:', line.length)
-                console.error('Line preview:', line.substring(0, 200) + '...')
+              } else if (eventType === 'error') {
+                const errorData = JSON.parse(dataString)
+                throw new Error(errorData.error || 'Search failed')
               }
+            } catch (parseError) {
+              console.error('Error parsing event:', eventType, parseError)
+              console.error('Data preview:', dataString.substring(0, 200))
             }
+            
+            eventStart = nextEventIndex + 2
+          }
+          
+          // Keep unprocessed data in buffer
+          if (eventStart > 0) {
+            searchBuffer = searchBuffer.substring(eventStart)
           }
         }
       }
