@@ -89,10 +89,11 @@ export function DocsyChat() {
         throw new Error('Search failed')
       }
       
-      // Read search stream
+      // Read search stream and collect results
       const searchReader = searchResponse.body?.getReader()
       const searchDecoder = new TextDecoder()
       let searchBuffer = ''
+      let finalSearchResults: SearchResult[] = []
       
       if (searchReader) {
         while (true) {
@@ -120,17 +121,18 @@ export function DocsyChat() {
                     timestamp: new Date().toISOString()
                   }])
                 } else if (currentEvent === 'results') {
-                  setSearchResults(data || [])
-                  console.log('SETTING search results to:', data?.length || 0, 'items')
+                  finalSearchResults = data || []
+                  setSearchResults(finalSearchResults)
+                  console.log('CAPTURED search results:', finalSearchResults?.length || 0, 'items')
                   // Show real data found
-                  if (data && data.length > 0) {
+                  if (finalSearchResults && finalSearchResults.length > 0) {
                     setWorkflowSteps(prev => [...prev, {
-                      step: `📊 REAL DATA: Found ${data.length} meeting records`,
+                      step: `📊 REAL DATA: Found ${finalSearchResults.length} meeting records`,
                       progress: 60,
                       timestamp: new Date().toISOString()
                     }])
                     // Show source agencies
-                    const agencySet = new Set(data.slice(0, 3).map((r: any) => r.metadata?.agency).filter(Boolean))
+                    const agencySet = new Set(finalSearchResults.slice(0, 3).map((r: any) => r.metadata?.agency).filter(Boolean))
                     const agencies = Array.from(agencySet)
                     if (agencies.length > 0) {
                       setWorkflowSteps(prev => [...prev, {
@@ -159,11 +161,11 @@ export function DocsyChat() {
       }
       
       // 2. Generate AI response using streaming
-      console.log('Passing search results to chat API:', searchResults?.length || 0, 'results')
+      console.log('Passing search results to chat API:', finalSearchResults?.length || 0, 'results')
       
       // Add debugging step to workflow
       setWorkflowSteps(prev => [...prev, {
-        step: `🔄 Passing ${searchResults?.length || 0} search results to AI`,
+        step: `🔄 Passing ${finalSearchResults?.length || 0} search results to AI`,
         progress: 95,
         timestamp: new Date().toISOString()
       }])
@@ -171,7 +173,7 @@ export function DocsyChat() {
       const chatResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, searchResults })
+        body: JSON.stringify({ query, searchResults: finalSearchResults })
       })
       
       if (!chatResponse.ok) {
@@ -212,9 +214,9 @@ export function DocsyChat() {
                   setCurrentResponse(fullResponse)
                 } else if (currentEvent === 'complete') {
                   // Add final workflow step with actual data sources
-                  if (searchResults && searchResults.length > 0) {
+                  if (finalSearchResults && finalSearchResults.length > 0) {
                     setWorkflowSteps(prev => [...prev, {
-                      step: `📋 Generated response using data from ${searchResults.length} meetings`,
+                      step: `📋 Generated response using data from ${finalSearchResults.length} meetings`,
                       progress: 100,
                       timestamp: new Date().toISOString()
                     }])
@@ -224,7 +226,7 @@ export function DocsyChat() {
                     id: (Date.now() + 1).toString(),
                     type: 'assistant',
                     content: data.fullResponse || fullResponse,
-                    results: searchResults,
+                    results: finalSearchResults,
                     timestamp: new Date()
                   }
                   setMessages(prev => [...prev, assistantMessage])
