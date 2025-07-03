@@ -119,11 +119,12 @@ export function DocsyChat() {
                   }])
                 } else if (currentEvent === 'results') {
                   searchResults = data
+                  console.log('Received search results:', data)
                   // Show real data found
                   if (data && data.length > 0) {
                     setWorkflowSteps(prev => [...prev, {
-                      step: `📊 Found ${data.length} meeting records with real data`,
-                      progress: 35,
+                      step: `📊 REAL DATA: Found ${data.length} meeting records`,
+                      progress: 60,
                       timestamp: new Date().toISOString()
                     }])
                     // Show source agencies
@@ -131,11 +132,17 @@ export function DocsyChat() {
                     const agencies = Array.from(agencySet)
                     if (agencies.length > 0) {
                       setWorkflowSteps(prev => [...prev, {
-                        step: `🏛️ Sources: ${agencies.join(', ')}`,
-                        progress: 40,
+                        step: `🏛️ ACTUAL SOURCES: ${agencies.join(', ')}`,
+                        progress: 70,
                         timestamp: new Date().toISOString()
                       }])
                     }
+                  } else {
+                    setWorkflowSteps(prev => [...prev, {
+                      step: `❌ PROBLEM: Search returned 0 results`,
+                      progress: 60,
+                      timestamp: new Date().toISOString()
+                    }])
                   }
                 } else if (currentEvent === 'error') {
                   throw new Error(data.error || 'Search failed')
@@ -150,6 +157,15 @@ export function DocsyChat() {
       }
       
       // 2. Generate AI response using streaming
+      console.log('Passing search results to chat API:', searchResults?.length || 0, 'results')
+      
+      // Add debugging step to workflow
+      setWorkflowSteps(prev => [...prev, {
+        step: `🔄 Passing ${searchResults?.length || 0} search results to AI`,
+        progress: 95,
+        timestamp: new Date().toISOString()
+      }])
+      
       const chatResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

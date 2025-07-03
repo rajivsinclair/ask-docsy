@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     sendEvent('search-started', { query, timestamp: new Date().toISOString() })
 
     // Step 1: Search in meetings table (which contains the denormalized data)
-    sendEvent('step', { step: 'Searching meeting notes...', progress: 10 })
+    sendEvent('step', { step: 'Searching meeting notes...', progress: 25 })
     
     const { data: meetings, error: meetingsError } = await supabase
       .from('meetings')
@@ -51,7 +51,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return
     }
 
-    sendEvent('step', { step: `Found ${meetings?.length || 0} relevant meetings`, progress: 30 })
+    const resultCount = meetings?.length || 0
+    sendEvent('step', { step: `Found ${resultCount} relevant meetings`, progress: 50 })
 
     // Since meetings table contains all the data we need, we'll skip the documents search
     sendEvent('step', { step: 'Processing results...', progress: 60 })
