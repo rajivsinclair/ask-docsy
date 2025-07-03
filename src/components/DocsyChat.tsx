@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Filter, Calendar, MapPin, Loader2 } from 'lucide-react'
+import { Send, Loader2 } from 'lucide-react'
 import { DocsyAvatar } from './DocsyAvatar'
-import { SearchFilters } from './SearchFilters'
 import { ResultCard } from './ResultCard'
-// Remove import of mcp-client since we'll use API routes
 
 interface SearchResult {
   id: string
@@ -33,14 +31,6 @@ export function DocsyChat() {
   const [query, setQuery] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isThinking, setIsThinking] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
-  const [filters, setFilters] = useState({
-    programs: [] as string[],
-    agencies: [] as string[],
-    date_from: '',
-    date_to: '',
-    search_method: 'hybrid' as 'semantic' | 'keyword' | 'hybrid'
-  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,7 +52,7 @@ export function DocsyChat() {
       const searchResponse = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, filters, limit: 10 })
+        body: JSON.stringify({ query, limit: 10 })
       })
       
       if (!searchResponse.ok) {
@@ -110,10 +100,10 @@ export function DocsyChat() {
   }
 
   const exampleQueries = [
-    "What housing policies are being discussed in Chicago?",
-    "Show me recent police reform discussions across cities",
-    "What did the Detroit City Council decide about budget cuts?",
-    "Compare climate change initiatives in different cities"
+    "Tell me about housing policies",
+    "Police reform discussions",
+    "Budget decisions",
+    "Climate initiatives"
   ]
 
   const handleExampleClick = (example: string) => {
@@ -123,7 +113,7 @@ export function DocsyChat() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Docsy Avatar */}
-      <div className="flex justify-center mb-8">
+      <div className="flex justify-center mb-12">
         <DocsyAvatar isThinking={isThinking} />
       </div>
 
@@ -131,65 +121,43 @@ export function DocsyChat() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.4 }}
-        className="bg-white rounded-2xl shadow-xl p-6 mb-8"
+        transition={{ duration: 0.4 }}
+        className="bg-yellow-100 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-8 mb-8"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="relative">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask Docsy about local government meetings..."
-              className="w-full px-6 py-4 text-lg border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder="Ask me anything about local government meetings..."
+              className="w-full px-6 py-4 text-lg border-4 border-black bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow"
               disabled={isThinking}
             />
-            <div className="absolute right-2 top-2 flex space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowFilters(!showFilters)}
-                className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
-              >
-                <Filter size={20} />
-              </button>
+            <div className="absolute right-2 top-2">
               <button
                 type="submit"
                 disabled={isThinking || !query.trim()}
-                className="bg-purple-600 text-white p-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="bg-yellow-400 hover:bg-yellow-500 border-2 border-black text-black p-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {isThinking ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
               </button>
             </div>
           </div>
-
-          {/* Filters */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
-              >
-                <SearchFilters filters={filters} onChange={setFilters} />
-              </motion.div>
-            )}
-          </AnimatePresence>
         </form>
 
         {/* Example Queries */}
         {messages.length === 0 && (
           <div className="mt-6">
-            <p className="text-sm text-gray-600 mb-3">Try asking about:</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <p className="text-lg font-bold text-black mb-4">Try asking me:</p>
+            <div className="grid grid-cols-2 gap-3">
               {exampleQueries.map((example, index) => (
                 <button
                   key={index}
                   onClick={() => handleExampleClick(example)}
-                  className="text-left p-3 text-sm bg-gray-50 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
+                  className="text-left p-3 bg-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:bg-yellow-50 transition-all font-medium"
                 >
-                  "{example}"
+                  {example}
                 </button>
               ))}
             </div>
@@ -204,15 +172,15 @@ export function DocsyChat() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-white rounded-2xl shadow-lg p-6 mb-6"
+            className="bg-yellow-200 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-6 mb-6"
           >
-            <div className="flex items-center space-x-3">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="flex items-center space-x-4">
+              <div className="flex space-x-2">
+                <div className="w-3 h-3 bg-black border border-black animate-bounce"></div>
+                <div className="w-3 h-3 bg-black border border-black animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-3 h-3 bg-black border border-black animate-bounce" style={{ animationDelay: '0.4s' }}></div>
               </div>
-              <span className="text-gray-600">Docsy is searching through thousands of meetings...</span>
+              <span className="text-black font-bold text-lg">Docsy is thinking...</span>
             </div>
           </motion.div>
         )}
@@ -235,21 +203,20 @@ export function DocsyChat() {
               }`}
             >
               {message.type === 'user' ? (
-                <div className="bg-purple-600 text-white p-4 rounded-2xl rounded-br-sm">
+                <div className="bg-yellow-400 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-black p-4 font-bold">
                   <p>{message.content}</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-6">
                   {/* AI Response */}
-                  <div className="prose prose-sm max-w-none mb-6">
-                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  <div className="mb-6">
+                    <div className="text-black font-medium leading-relaxed whitespace-pre-wrap">{message.content}</div>
                   </div>
 
                   {/* Search Results */}
                   {message.results && message.results.length > 0 && (
                     <div>
-                      <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <Calendar size={20} className="mr-2" />
+                      <h4 className="text-xl font-bold text-black mb-4 border-b-4 border-black pb-2">
                         Meeting Records ({message.results.length})
                       </h4>
                       <div className="grid gap-4">
@@ -258,8 +225,8 @@ export function DocsyChat() {
                         ))}
                       </div>
                       {message.results.length > 5 && (
-                        <p className="text-sm text-gray-500 mt-4 text-center">
-                          And {message.results.length - 5} more results...
+                        <p className="text-black font-bold mt-4 text-center">
+                          And {message.results.length - 5} more results found!
                         </p>
                       )}
                     </div>

@@ -1,4 +1,4 @@
-import { Calendar, MapPin, Building, TrendingUp } from 'lucide-react'
+import { Calendar, MapPin, Building } from 'lucide-react'
 
 interface ResultCardProps {
   result: {
@@ -32,81 +32,46 @@ export function ResultCard({ result }: ResultCardProps) {
     }
   }
 
-  const getScoreColor = (score: number) => {
-    if (score > 0.8) return 'text-green-600'
-    if (score > 0.6) return 'text-yellow-600'
-    return 'text-gray-500'
-  }
-
-  const getSearchTypeColor = (type: string) => {
-    switch (type) {
-      case 'semantic': return 'bg-purple-100 text-purple-800'
-      case 'keyword': return 'bg-blue-100 text-blue-800'
-      case 'hybrid': return 'bg-green-100 text-green-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+    <div className="border-4 border-black bg-yellow-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow">
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <h4 className="font-semibold text-gray-900 mb-1">
-            {metadata.assignment_name || 'Unknown Meeting'}
-          </h4>
-          <div className="flex items-center space-x-4 text-sm text-gray-600">
-            <span className="flex items-center">
-              <Building size={14} className="mr-1" />
-              {metadata.agency}
-            </span>
-            <span className="flex items-center">
-              <MapPin size={14} className="mr-1" />
-              {metadata.program}
-            </span>
-            <span className="flex items-center">
-              <Calendar size={14} className="mr-1" />
-              {formatDate(metadata.meeting_date)}
-            </span>
-          </div>
-        </div>
-        
-        <div className="flex items-center space-x-2 ml-4">
-          <span className={`flex items-center text-sm font-medium ${getScoreColor(score)}`}>
-            <TrendingUp size={14} className="mr-1" />
-            {(score * 100).toFixed(0)}%
+      <div className="mb-3">
+        <h4 className="font-bold text-black mb-2 text-lg">
+          {metadata.assignment_name || 'Unknown Meeting'}
+        </h4>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <span className="flex items-center bg-white border-2 border-black p-1 font-medium">
+            <Building size={14} className="mr-1" />
+            {metadata.agency}
           </span>
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSearchTypeColor(search_type)}`}>
-            {search_type}
+          <span className="flex items-center bg-white border-2 border-black p-1 font-medium">
+            <MapPin size={14} className="mr-1" />
+            {metadata.program}
+          </span>
+          <span className="flex items-center bg-white border-2 border-black p-1 font-medium">
+            <Calendar size={14} className="mr-1" />
+            {formatDate(metadata.meeting_date)}
           </span>
         </div>
       </div>
 
       {/* Content Preview */}
-      <div className="text-sm text-gray-700 leading-relaxed">
-        {text.length > 300 ? (
+      <div className="text-black font-medium leading-relaxed bg-white border-2 border-black p-3">
+        {text.length > 200 ? (
           <>
-            {text.substring(0, 300)}
-            <span className="text-gray-500">...</span>
+            {text.substring(0, 200)}
+            <span className="font-bold">...</span>
           </>
         ) : (
           text
         )}
       </div>
 
-      {/* Context Information */}
-      {result.context?.surrounding_text && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-xs text-gray-500 mb-1">Context:</p>
-          <p className="text-xs text-gray-600 italic">
-            {result.context.surrounding_text.substring(0, 150)}...
-          </p>
-        </div>
-      )}
-
-      {/* Metadata Footer */}
-      <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-        Document Type: {metadata.document_type || 'Meeting Notes'}
+      {/* Search Type Badge */}
+      <div className="mt-3">
+        <span className="bg-yellow-400 border-2 border-black px-2 py-1 text-xs font-bold uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+          {search_type} match
+        </span>
       </div>
     </div>
   )
