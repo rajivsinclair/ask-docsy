@@ -92,32 +92,39 @@ export function DocsyChat() {
       // Read search stream
       const searchReader = searchResponse.body?.getReader()
       const searchDecoder = new TextDecoder()
+      let searchBuffer = ''
       
       if (searchReader) {
         while (true) {
           const { done, value } = await searchReader.read()
           if (done) break
           
-          const chunk = searchDecoder.decode(value)
-          const lines = chunk.split('\n')
+          searchBuffer += searchDecoder.decode(value, { stream: true })
+          const lines = searchBuffer.split('\n')
+          searchBuffer = lines.pop() || '' // Keep incomplete line in buffer
           
+          let currentEvent = ''
           for (const line of lines) {
             if (line.startsWith('event:')) {
-              const eventType = line.substring(6).trim()
-              const dataLine = lines[lines.indexOf(line) + 1]
-              
-              if (dataLine?.startsWith('data:')) {
-                const data = JSON.parse(dataLine.substring(5))
+              currentEvent = line.substring(6).trim()
+            } else if (line.startsWith('data:') && currentEvent) {
+              try {
+                const data = JSON.parse(line.substring(5))
                 
-                if (eventType === 'step') {
+                if (currentEvent === 'step') {
                   setWorkflowSteps(prev => [...prev, {
                     step: data.step,
                     progress: data.progress,
                     timestamp: new Date().toISOString()
                   }])
-                } else if (eventType === 'results') {
+                } else if (currentEvent === 'results') {
                   searchResults = data
+                } else if (currentEvent === 'error') {
+                  throw new Error(data.error || 'Search failed')
                 }
+                currentEvent = '' // Reset after processing
+              } catch (parseError) {
+                console.error('Error parsing search data:', parseError)
               }
             }
           }
@@ -139,43 +146,50 @@ export function DocsyChat() {
       const chatReader = chatResponse.body?.getReader()
       const chatDecoder = new TextDecoder()
       let fullResponse = ''
+      let chatBuffer = ''
       
       if (chatReader) {
         while (true) {
           const { done, value } = await chatReader.read()
           if (done) break
           
-          const chunk = chatDecoder.decode(value)
-          const lines = chunk.split('\n')
+          chatBuffer += chatDecoder.decode(value, { stream: true })
+          const lines = chatBuffer.split('\n')
+          chatBuffer = lines.pop() || '' // Keep incomplete line in buffer
           
+          let currentEvent = ''
           for (const line of lines) {
             if (line.startsWith('event:')) {
-              const eventType = line.substring(6).trim()
-              const dataLine = lines[lines.indexOf(line) + 1]
-              
-              if (dataLine?.startsWith('data:')) {
-                const data = JSON.parse(dataLine.substring(5))
+              currentEvent = line.substring(6).trim()
+            } else if (line.startsWith('data:') && currentEvent) {
+              try {
+                const data = JSON.parse(line.substring(5))
                 
-                if (eventType === 'step') {
+                if (currentEvent === 'step') {
                   setWorkflowSteps(prev => [...prev, {
                     step: data.step,
                     progress: data.progress,
                     timestamp: new Date().toISOString()
                   }])
-                } else if (eventType === 'chunk') {
+                } else if (currentEvent === 'chunk') {
                   fullResponse += data.text
                   setCurrentResponse(fullResponse)
-                } else if (eventType === 'complete') {
+                } else if (currentEvent === 'complete') {
                   const assistantMessage: ChatMessage = {
                     id: (Date.now() + 1).toString(),
                     type: 'assistant',
-                    content: data.fullResponse,
+                    content: data.fullResponse || fullResponse,
                     results: searchResults,
                     timestamp: new Date()
                   }
                   setMessages(prev => [...prev, assistantMessage])
                   setCurrentResponse('')
+                } else if (currentEvent === 'error') {
+                  throw new Error(data.error || 'AI response failed')
                 }
+                currentEvent = '' // Reset after processing
+              } catch (parseError) {
+                console.error('Error parsing chat data:', parseError)
               }
             }
           }

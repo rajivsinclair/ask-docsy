@@ -31,9 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create context from search results
     const context = searchResults?.map((result: any) => 
-      `Source: ${result.metadata.agency} - ${result.metadata.assignment_name} (${result.metadata.meeting_date})
-Program: ${result.metadata.program}
-Content: ${result.text.substring(0, 500)}...`
+      `Source: ${result.metadata?.agency || 'Unknown'} - ${result.metadata?.assignment_name || 'Unknown Meeting'} (${result.metadata?.meeting_date || 'Unknown Date'})
+Program: ${result.metadata?.program || 'Unknown'}
+Content: ${result.text?.substring(0, 500) || 'No content'}...`
     ).join('\n\n---\n\n') || ''
 
     sendEvent('step', { step: 'Preparing context from meeting notes...', progress: 20 })
@@ -204,7 +204,35 @@ Response:`
       
       modelUsed = 'gpt-4.1'
     } else {
-      throw new Error('No AI API keys configured. Please set either GEMINI_API_KEY or OPENAI_API_KEY.')
+      // No AI API keys available - provide a helpful response with search results
+      sendEvent('step', { step: 'Formatting search results...', progress: 50 })
+      
+      if (searchResults && searchResults.length > 0) {
+        fullResponse = `Hi! I found ${searchResults.length} relevant meeting${searchResults.length > 1 ? 's' : ''} about "${query}":\n\n`
+        
+        searchResults.slice(0, 3).forEach((result: any, index: number) => {
+          fullResponse += `**${index + 1}. ${result.metadata?.assignment_name || 'Meeting'}**\n`
+          fullResponse += `Agency: ${result.metadata?.agency || 'Unknown'}\n`
+          fullResponse += `Date: ${result.metadata?.meeting_date ? new Date(result.metadata.meeting_date).toLocaleDateString() : 'Unknown'}\n`
+          fullResponse += `Summary: ${result.text?.substring(0, 200) || 'No summary available'}...\n\n`
+        })
+        
+        fullResponse += `\nNote: AI analysis is currently unavailable. Please configure either GEMINI_API_KEY or OPENAI_API_KEY environment variables for enhanced AI responses.`
+      } else {
+        fullResponse = `I searched for "${query}" but didn't find any relevant meetings in our database. This could mean:\n\n• No meetings have discussed this topic recently\n• The topic might be handled by a different agency\n• The search terms might need to be adjusted\n\nTry searching for broader terms or related topics.`
+      }
+      
+      // Simulate streaming for consistent UX
+      for (let i = 0; i < fullResponse.length; i += 50) {
+        const chunk = fullResponse.substring(i, i + 50)
+        sendEvent('chunk', { 
+          text: chunk, 
+          chunkNumber: Math.floor(i / 50) + 1,
+          progress: Math.min(50 + (i / fullResponse.length) * 40, 90) 
+        })
+      }
+      
+      modelUsed = 'search-only-mode'
     }
 
     sendEvent('step', { step: 'Response complete!', progress: 100 })
