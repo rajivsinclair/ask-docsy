@@ -107,9 +107,11 @@ export function DocsyChat() {
           for (const line of lines) {
             if (line.startsWith('event:')) {
               currentEvent = line.substring(6).trim()
+              console.log('Event type:', currentEvent)
             } else if (line.startsWith('data:') && currentEvent) {
               try {
                 const data = JSON.parse(line.substring(5))
+                console.log('Event data for', currentEvent, ':', data)
                 
                 if (currentEvent === 'step') {
                   setWorkflowSteps(prev => [...prev, {
@@ -119,7 +121,7 @@ export function DocsyChat() {
                   }])
                 } else if (currentEvent === 'results') {
                   searchResults = data
-                  console.log('Received search results:', data)
+                  console.log('SETTING search results to:', data?.length || 0, 'items')
                   // Show real data found
                   if (data && data.length > 0) {
                     setWorkflowSteps(prev => [...prev, {
@@ -149,7 +151,7 @@ export function DocsyChat() {
                 }
                 currentEvent = '' // Reset after processing
               } catch (parseError) {
-                console.error('Error parsing search data:', parseError)
+                console.error('Error parsing search data:', parseError, 'Line:', line)
               }
             }
           }
