@@ -119,6 +119,24 @@ export function DocsyChat() {
                   }])
                 } else if (currentEvent === 'results') {
                   searchResults = data
+                  // Show real data found
+                  if (data && data.length > 0) {
+                    setWorkflowSteps(prev => [...prev, {
+                      step: `📊 Found ${data.length} meeting records with real data`,
+                      progress: 35,
+                      timestamp: new Date().toISOString()
+                    }])
+                    // Show source agencies
+                    const agencySet = new Set(data.slice(0, 3).map((r: any) => r.metadata?.agency).filter(Boolean))
+                    const agencies = Array.from(agencySet)
+                    if (agencies.length > 0) {
+                      setWorkflowSteps(prev => [...prev, {
+                        step: `🏛️ Sources: ${agencies.join(', ')}`,
+                        progress: 40,
+                        timestamp: new Date().toISOString()
+                      }])
+                    }
+                  }
                 } else if (currentEvent === 'error') {
                   throw new Error(data.error || 'Search failed')
                 }
@@ -175,6 +193,15 @@ export function DocsyChat() {
                   fullResponse += data.text
                   setCurrentResponse(fullResponse)
                 } else if (currentEvent === 'complete') {
+                  // Add final workflow step with actual data sources
+                  if (searchResults && searchResults.length > 0) {
+                    setWorkflowSteps(prev => [...prev, {
+                      step: `📋 Generated response using data from ${searchResults.length} meetings`,
+                      progress: 100,
+                      timestamp: new Date().toISOString()
+                    }])
+                  }
+                  
                   const assistantMessage: ChatMessage = {
                     id: (Date.now() + 1).toString(),
                     type: 'assistant',
@@ -229,7 +256,7 @@ export function DocsyChat() {
       }])
     } finally {
       setIsThinking(false)
-      setTimeout(() => setWorkflowSteps([]), 5000) // Clear workflow after 5 seconds
+      // Keep workflow visible to show what data was used
     }
   }
 
