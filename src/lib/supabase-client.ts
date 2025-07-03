@@ -127,10 +127,11 @@ export class OptimizedSupabaseClient {
       const combined = [
         ...(documents || []).map(d => ({ ...d, type: 'document' })),
         ...(meetings || []).map(m => ({ ...m, type: 'meeting' }))
-      ].sort((a, b) => 
-        new Date(b.created_at || b.start_date).getTime() - 
-        new Date(a.created_at || a.start_date).getTime()
-      ).slice(0, limit);
+      ].sort((a: any, b: any) => {
+        const dateA = a.created_at || a.start_date || new Date();
+        const dateB = b.created_at || b.start_date || new Date();
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      }).slice(0, limit);
 
       this.setCache(cacheKey, combined);
       return combined;

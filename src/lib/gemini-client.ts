@@ -1,18 +1,29 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export class GeminiClient {
-  private genAI: GoogleGenerativeAI;
-  private model: any;
+  private genAI: GoogleGenerativeAI | null = null;
+  private model: any = null;
 
-  constructor(apiKey: string = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '') {
-    if (!apiKey) {
+  constructor(apiKey: string = '') {
+    // Use the provided API key or fallback to env variable
+    const key = apiKey || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+    
+    // Only throw error if we're on the client side and no key is available
+    if (typeof window !== 'undefined' && !key) {
       throw new Error('Gemini API key is required');
     }
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    
+    // Initialize only if we have a key
+    if (key) {
+      this.genAI = new GoogleGenerativeAI(key);
+      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    }
   }
 
   async generateResponse(query: string, context: any[]) {
+    if (!this.model) {
+      throw new Error('Gemini model not initialized');
+    }
     try {
       const prompt = `
 You are Docsy, a helpful AI assistant for government documents and programs. 
