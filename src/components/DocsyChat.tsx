@@ -151,7 +151,7 @@ export function DocsyChat() {
                 } else if (currentEvent === 'error') {
                   throw new Error(data.error || 'Search failed')
                 }
-                currentEvent = '' // Reset after processing
+                // Don't reset currentEvent here - let it persist until next event
               } catch (parseError) {
                 console.error('Error parsing search data:', parseError, 'Line:', line)
               }
@@ -234,7 +234,7 @@ export function DocsyChat() {
                 } else if (currentEvent === 'error') {
                   throw new Error(data.error || 'AI response failed')
                 }
-                currentEvent = '' // Reset after processing
+                // Don't reset currentEvent here - let it persist until next event
               } catch (parseError) {
                 console.error('Error parsing chat data:', parseError)
               }
