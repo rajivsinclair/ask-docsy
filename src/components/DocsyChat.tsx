@@ -40,6 +40,7 @@ export function DocsyChat() {
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([])
   const [currentResponse, setCurrentResponse] = useState('')
   const [examples, setExamples] = useState(0)
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
 
   const exampleQueries = [
     ["Housing affordability crisis", "Tenant rights protection"],
@@ -74,6 +75,7 @@ export function DocsyChat() {
     setQuery('')
     setWorkflowSteps([])
     setCurrentResponse('')
+    setSearchResults([]) // Clear previous results
 
     try {
       // 1. Search using streaming API
@@ -86,8 +88,6 @@ export function DocsyChat() {
       if (!searchResponse.ok) {
         throw new Error('Search failed')
       }
-
-      let searchResults: SearchResult[] = []
       
       // Read search stream
       const searchReader = searchResponse.body?.getReader()
@@ -120,7 +120,7 @@ export function DocsyChat() {
                     timestamp: new Date().toISOString()
                   }])
                 } else if (currentEvent === 'results') {
-                  searchResults = data
+                  setSearchResults(data || [])
                   console.log('SETTING search results to:', data?.length || 0, 'items')
                   // Show real data found
                   if (data && data.length > 0) {
