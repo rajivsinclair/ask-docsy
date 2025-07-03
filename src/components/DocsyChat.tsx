@@ -121,9 +121,12 @@ export function DocsyChat() {
                     timestamp: new Date().toISOString()
                   }])
                 } else if (currentEvent === 'results') {
+                  console.log('PROCESSING results event, raw data:', data)
+                  console.log('Data type:', typeof data, 'Array?', Array.isArray(data))
                   finalSearchResults = data || []
                   setSearchResults(finalSearchResults)
                   console.log('CAPTURED search results:', finalSearchResults?.length || 0, 'items')
+                  console.log('Final search results variable:', finalSearchResults)
                   // Show real data found
                   if (finalSearchResults && finalSearchResults.length > 0) {
                     setWorkflowSteps(prev => [...prev, {
@@ -162,6 +165,8 @@ export function DocsyChat() {
       
       // 2. Generate AI response using streaming
       console.log('Passing search results to chat API:', finalSearchResults?.length || 0, 'results')
+      console.log('Final search results before chat API:', finalSearchResults)
+      console.log('Type check:', typeof finalSearchResults, Array.isArray(finalSearchResults))
       
       // Add debugging step to workflow
       setWorkflowSteps(prev => [...prev, {
